@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Contador de Encestes · Pizarra de Tiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#161A22; --panel:#1E242F; --deep:#10141B; --line:#2A3140;
+    --chalk:#F4EFE3; --amber:#FFB454; --made:#43B36A; --miss:#D9534F;
+    --ball:#F0742F; --mut:#8B93A3;
+    --disp:'Anton',Impact,'Arial Narrow',sans-serif;
+    --cond:'Barlow Condensed','Arial Narrow',sans-serif;
+    --body:'Barlow',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--chalk);font-family:var(--body);min-height:100vh}
+  .wrap{max-width:520px;margin:0 auto;padding:14px 14px 40px}
+  .eyebrow{font-family:var(--cond);color:var(--mut);font-size:12px;letter-spacing:.22em;text-transform:uppercase}
+  h1{font-family:var(--disp);font-size:26px;letter-spacing:.04em;line-height:1.1;font-weight:400}
+  button{font-family:inherit;border:none;cursor:pointer;color:inherit;background:none}
+  button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+  /* Marcador */
+  .board{background:var(--deep);border:1px solid var(--line);border-radius:16px;
+         display:grid;grid-template-columns:1fr 1fr 1fr;margin:12px 0;padding:6px 4px}
+  .cell{display:flex;flex-direction:column;align-items:center;padding:6px 0}
+  .digit{font-family:var(--disp);font-size:36px;line-height:1}
+  .cell small{font-family:var(--cond);font-size:11px;letter-spacing:.18em;color:var(--mut);text-transform:uppercase;margin-top:3px}
+
+  /* Video + zonas */
+  .cam{position:relative;width:100%;background:#000;border-radius:14px;overflow:hidden;
+       border:1px solid var(--line);aspect-ratio:4/3}
+  .cam video{width:100%;height:100%;display:block;object-fit:fill}
+  .overlay{position:absolute;inset:0}
+  .zone{position:absolute;border:2.5px solid;border-radius:6px;touch-action:none}
+  .zone .tag{position:absolute;top:-2px;left:-2px;transform:translateY(-100%);
+             font-family:var(--disp);font-size:12px;letter-spacing:.08em;
+             padding:1px 7px;border-radius:5px 5px 0 0;color:#1A0E02}
+  .zone .grip{position:absolute;right:-11px;bottom:-11px;width:26px;height:26px;border-radius:50%;
+              border:2.5px solid;background:var(--deep);touch-action:none}
+  #zA{border-color:var(--ball)} #zA .tag{background:var(--ball)} #zA .grip{border-color:var(--ball)}
+  #zB{border-color:var(--made)} #zB .tag{background:var(--made)} #zB .grip{border-color:var(--made)}
+  .detecting .zone{border-width:1.5px;opacity:.65;pointer-events:none}
+  .detecting .zone .grip,.detecting .zone .tag{display:none}
+
+  .flash{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+         font-family:var(--disp);font-size:56px;letter-spacing:.06em;color:#fff;
+         text-shadow:0 2px 14px rgba(0,0,0,.5)}
+  .flash.on{display:flex;animation:fl .55s ease-out forwards}
+  @keyframes fl{0%{opacity:.95}100%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.flash.on{animation:none;opacity:.9}}
+
+  .pill{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);
+        background:rgba(16,20,27,.85);border:1px solid var(--line);border-radius:999px;
+        padding:5px 14px;font-family:var(--cond);font-size:14px;letter-spacing:.06em;white-space:nowrap}
+
+  .startcam{position:absolute;inset:0;display:flex;flex-direction:column;gap:10px;
+            align-items:center;justify-content:center;background:var(--deep)}
+  .bigbtn{background:var(--ball);color:#2A1102;font-family:var(--disp);font-size:19px;
+          letter-spacing:.06em;border-radius:16px;padding:15px 26px}
+  .bigbtn:active{transform:scale(.96)}
+
+  /* Medidores */
+  .meters{display:grid;grid-template-columns:44px 1fr;gap:6px 10px;align-items:center;
+          background:var(--panel);border:1px solid var(--line);border-radius:12px;
+          padding:10px 12px;margin-top:10px}
+  .meters label{font-family:var(--disp);font-size:12px;letter-spacing:.06em}
+  .mtrack{position:relative;height:10px;background:var(--deep);border-radius:99px;overflow:visible}
+  .mfill{height:100%;width:0%;border-radius:99px;transition:width .08s linear}
+  #mA .mfill{background:var(--ball)} #mB .mfill{background:var(--made)}
+  .mthr{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--amber)}
+
+  /* Controles */
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--panel);
+       border:1px solid var(--line);border-radius:999px;padding:4px;margin-top:12px}
+  .seg button{font-family:var(--cond);font-size:16px;letter-spacing:.08em;padding:10px 0;
+              border-radius:999px;color:var(--mut)}
+  .seg button.on{background:var(--deep);color:var(--amber)}
+
+  .row{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  .slider{flex:1;display:flex;align-items:center;gap:10px;background:var(--panel);
+          border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .slider span{font-family:var(--cond);font-size:13px;letter-spacing:.08em;color:var(--mut);white-space:nowrap}
+  input[type=range]{flex:1;accent-color:var(--amber)}
+  .tgl{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+       padding:10px 14px;font-family:var(--cond);letter-spacing:.08em;font-size:14px;color:var(--mut)}
+  .tgl.on{color:var(--amber);border-color:var(--amber)}
+
+  .manual{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+  .manual button{border-radius:14px;padding:13px 0;font-family:var(--cond);font-size:15px;letter-spacing:.06em;
+                 background:var(--panel);border:1px solid var(--line)}
+  #btnMake{color:var(--made)} #btnMiss{color:var(--miss)}
+
+  .log{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:14px}
+  .log ul{list-style:none;margin-top:6px}
+  .log li{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid var(--line)}
+  .log li:last-child{border-bottom:none}
+  .ok{color:var(--made)} .no{color:var(--miss)}
+  .reset{display:block;margin:14px auto 0;font-family:var(--cond);font-size:12px;
+         letter-spacing:.12em;color:var(--mut);text-transform:uppercase}
+  .reset.warn{color:var(--miss)}
+
+  /* Ayuda / error */
+  .modal{position:fixed;inset:0;background:rgba(10,13,18,.9);display:none;
+         align-items:center;justify-content:center;padding:20px;z-index:50}
+  .modal.on{display:flex}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+        padding:22px;max-width:420px;width:100%}
+  .card h2{font-family:var(--disp);font-size:20px;letter-spacing:.04em;font-weight:400;margin:4px 0 12px}
+  .card ol{margin:0 0 16px 20px;display:grid;gap:10px;font-size:15px;line-height:1.45}
+  .card b{color:var(--amber);font-weight:600}
+  .hid{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Sistema interno · entrenamiento</div>
+    <h1>CONTADOR DE ENCESTES</h1>
+  </header>
+
+  <div class="board">
+    <div class="cell"><div class="digit" id="cMake" style="color:var(--made)">0</div><small>Dentro</small></div>
+    <div class="cell"><div class="digit" id="cMiss" style="color:var(--miss)">0</div><small>Fuera</small></div>
+    <div class="cell"><div class="digit" id="cPct" style="color:var(--amber)">—</div><small>Efect.</small></div>
+  </div>
+
+  <div class="cam" id="cam">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="overlay" id="overlay">
+      <div class="zone" id="zA"><span class="tag">ARO</span><span class="grip" data-grip="A"></span></div>
+      <div class="zone" id="zB"><span class="tag">RED</span><span class="grip" data-grip="B"></span></div>
+    </div>
+    <div class="flash" id="flash"></div>
+    <div class="pill" id="pill">Activa la cámara</div>
+    <div class="startcam" id="startcam">
+      <button class="bigbtn" id="btnCam">ACTIVAR CÁMARA</button>
+      <span style="color:var(--mut);font-size:13px">Se usa la cámara trasera</span>
+    </div>
+  </div>
+
+  <div class="meters">
+    <label style="color:var(--ball)">ARO</label>
+    <div class="mtrack" id="mA"><div class="mfill"></div><div class="mthr"></div></div>
+    <label style="color:var(--made)">RED</label>
+    <div class="mtrack" id="mB"><div class="mfill"></div><div class="mthr"></div></div>
+  </div>
+
+  <div class="seg">
+    <button id="segAdj" class="on">AJUSTAR ZONAS</button>
+    <button id="segDet">DETECTAR</button>
+  </div>
+
+  <div class="row">
+    <div class="slider">
+      <span>Sensibilidad</span>
+      <input type="range" id="thr" min="5" max="45" value="16" />
+      <span id="thrVal" style="color:var(--amber)">16</span>
+    </div>
+    <button class="tgl on" id="btnSound">SONIDO</button>
+  </div>
+
+  <div class="manual">
+    <button id="btnMake">+ DENTRO</button>
+    <button id="btnMiss">+ FUERA</button>
+    <button id="btnUndo">DESHACER</button>
+  </div>
+
+  <div class="log">
+    <div class="eyebrow">Últimos registros</div>
+    <ul id="logList"><li style="color:var(--mut)">Sin tiros todavía.</li></ul>
+  </div>
+  <button class="reset" id="btnReset">Reiniciar contador</button>
+</div>
+
+<!-- Primeros pasos -->
+<div class="modal on" id="help">
+  <div class="card">
+    <div class="eyebrow">Cómo se usa</div>
+    <h2>TRES PASOS</h2>
+    <ol>
+      <li>Pon el teléfono en un <b>trípode o apoyo fijo</b> apuntando al aro (2 a 5 m), de modo que se vean el aro y la red completos.</li>
+      <li>Activa la cámara y arrastra los recuadros: <b>ARO</b> justo sobre la boca del aro y <b>RED</b> bajo la red, por donde sale el balón.</li>
+      <li>Pulsa <b>DETECTAR</b> y entrena. Balón que cruza ARO y luego RED cuenta dentro; si cruza ARO y no sale por RED, cuenta fuera.</li>
+    </ol>
+    <button class="bigbtn" style="width:100%" id="btnHelpOk">ENTENDIDO</button>
+  </div>
+</div>
+
+<!-- Cámara no disponible -->
+<div class="modal" id="camErr">
+  <div class="card">
+    <div class="eyebrow">Cámara no disponible</div>
+    <h2>ABRE ESTA PÁGINA DESDE UNA URL HTTPS</h2>
+    <p style="font-size:15px;line-height:1.5;margin-bottom:12px">
+      Los navegadores solo entregan la cámara a páginas servidas por https
+      (y no funciona dentro de la vista previa de Claude). Publícala gratis:
+    </p>
+    <ol>
+      <li>Descarga este archivo al teléfono.</li>
+      <li>Entra a <b>tiiny.host</b>, crea una cuenta gratuita y sube el archivo.</li>
+      <li>Abre el <b>enlace https</b> que te entrega, en Chrome, y acepta el permiso de cámara.</li>
+    </ol>
+    <button class="bigbtn" style="width:100%" id="btnErrOk">CERRAR</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var video=$('video'), overlay=$('overlay'), cam=$('cam'), pill=$('pill'), flash=$('flash');
+
+  /* ---------- almacenamiento tolerante ---------- */
+  function sGet(k,f){ try{ var v=localStorage.getItem(k); return v?JSON.parse(v):f; }catch(e){ return f; } }
+  function sSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+
+  /* ---------- estado ---------- */
+  var zones = sGet('ce-zonas', {
+    A:{x:.38,y:.24,w:.24,h:.11},
+    B:{x:.40,y:.42,w:.20,h:.13}
+  });
+  var events = sGet('ce-eventos', []);
+  var thr = sGet('ce-thr', 16);
+  var sound = sGet('ce-sonido', true);
+  var mode='adjust', camOn=false;
+  var phase='idle', tA=0, lockUntil=0;
+  var PW=160, PH=120, gray=null, prev=null, prevOk=false, lastT=0;
+  var pcan=document.createElement('canvas'), pctx=pcan.getContext('2d',{willReadFrequently:true});
+  var audio=null, wake=null;
+
+  /* ---------- zonas: render y arrastre ---------- */
+  var boxes={A:$('zA'),B:$('zB')};
+  function drawZones(){
+    ['A','B'].forEach(function(k){
+      var z=zones[k], b=boxes[k];
+      b.style.left=(z.x*100)+'%'; b.style.top=(z.y*100)+'%';
+      b.style.width=(z.w*100)+'%'; b.style.height=(z.h*100)+'%';
+    });
+  }
+  var drag=null;
+  function onDown(e){
+    if(mode!=='adjust') return;
+    var t=e.target, k=null, resize=false;
+    if(t.dataset && t.dataset.grip){ k=t.dataset.grip; resize=true; }
+    else if(t.closest('#zA')) k='A';
+    else if(t.closest('#zB')) k='B';
+    if(!k) return;
+    e.preventDefault();
+    var r=overlay.getBoundingClientRect();
+    drag={k:k,resize:resize,r:r,sx:e.clientX,sy:e.clientY,
+          z:{x:zones[k].x,y:zones[k].y,w:zones[k].w,h:zones[k].h}};
+    try{ overlay.setPointerCapture(e.pointerId); }catch(err){}
+  }
+  function onMove(e){
+    if(!drag) return;
+    e.preventDefault();
+    var dx=(e.clientX-drag.sx)/drag.r.width, dy=(e.clientY-drag.sy)/drag.r.height;
+    var z=zones[drag.k], o=drag.z;
+    if(drag.resize){
+      z.w=Math.min(.9,Math.max(.05,o.w+dx));
+      z.h=Math.min(.9,Math.max(.04,o.h+dy));
+    }else{
+      z.x=Math.max(0,Math.min(1-z.w,o.x+dx));
+      z.y=Math.max(0,Math.min(1-z.h,o.y+dy));
+    }
+    drawZones();
+  }
+  function onUp(){ if(drag){ drag=null; sSet('ce-zonas',zones); } }
+  overlay.addEventListener('pointerdown',onDown);
+  overlay.addEventListener('pointermove',onMove);
+  overlay.addEventListener('pointerup',onUp);
+  overlay.addEventListener('pointercancel',onUp);
+
+  /* ---------- cámara ---------- */
+  $('btnCam').addEventListener('click', function(){
+    initAudio();
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ $('camErr').classList.add('on'); return; }
+    navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720} }, audio:false
+    }).then(function(stream){
+      video.srcObject=stream;
+      video.onloadedmetadata=function(){
+        video.play().catch(function(){});
+        var vw=video.videoWidth||640, vh=video.videoHeight||480;
+        cam.style.aspectRatio=vw+' / '+vh;
+        PH=Math.max(60,Math.round(PW*vh/vw));
+        pcan.width=PW; pcan.height=PH;
+        gray=new Float32Array(PW*PH); prev=new Float32Array(PW*PH); prevOk=false;
+        camOn=true;
+        $('startcam').classList.add('hid');
+        setPill('Modo ajuste: arrastra ARO y RED');
+        requestAnimationFrame(tick);
+      };
+    }).catch(function(){ $('camErr').classList.add('on'); });
+  });
+
+  /* ---------- bucle de análisis ---------- */
+  function zoneScore(z){
+    var x0=Math.max(0,Math.floor(z.x*PW)), y0=Math.max(0,Math.floor(z.y*PH));
+    var x1=Math.min(PW,Math.ceil((z.x+z.w)*PW)), y1=Math.min(PH,Math.ceil((z.y+z.h)*PH));
+    var sum=0,n=0;
+    for(var y=y0;y<y1;y+=2){
+      var row=y*PW;
+      for(var x=x0;x<x1;x+=2){
+        var i=row+x;
+        sum+=Math.abs(gray[i]-prev[i]); n++;
+      }
+    }
+    return n? sum/n : 0;
+  }
+  function tick(ts){
+    if(!camOn) return;
+    requestAnimationFrame(tick);
+    if(ts-lastT<33) return;
+    lastT=ts;
+    if(!video.videoWidth) return;
+    pctx.drawImage(video,0,0,PW,PH);
+    var d=pctx.getImageData(0,0,PW,PH).data;
+    for(var i=0,j=0;i<d.length;i+=4,j++) gray[j]=(d[i]+d[i+1]+d[i+2])/3;
+    if(prevOk){
+      var sA=zoneScore(zones.A), sB=zoneScore(zones.B);
+      meter('mA',sA); meter('mB',sB);
+      if(mode==='detect') machine(sA,sB,performance.now());
+    }
+    var tmp=prev; prev=gray; gray=tmp;
+    prevOk=true;
+  }
+  function meter(id,s){
+    var el=$(id).firstElementChild;
+    el.style.width=Math.min(100,(s/50)*100)+'%';
+  }
+  function thrTicks(){
+    var p=Math.min(100,(thr/50)*100)+'%';
+    $('mA').lastElementChild.style.left=p;
+    $('mB').lastElementChild.style.left=p;
+  }
+
+  /* ---------- máquina de estados ---------- */
+  var A_MIN=50, A_MAX=1000, LOCK_MAKE=1600, LOCK_MISS=1100;
+  function machine(sA,sB,now){
+    if(now<lockUntil) return;
+    if(phase==='idle'){
+      if(sA>thr){ phase='armed'; tA=now; setPill('Balón en el aro…'); }
+    }else if(phase==='armed'){
+      var dt=now-tA;
+      if(dt>=A_MIN && sB>thr) result(true,now);
+      else if(dt>A_MAX) result(false,now);
+    }
+  }
+  function result(made,now){
+    phase='idle';
+    lockUntil=now+(made?LOCK_MAKE:LOCK_MISS);
+    addEvent(made,'auto');
+    flashShow(made);
+    beep(made);
+    if(navigator.vibrate){ try{ navigator.vibrate(made?[70]:[30,50,30]); }catch(e){} }
+    setTimeout(function(){ if(mode==='detect') setPill('Esperando tiro…'); }, made?900:700);
+  }
+
+  /* ---------- eventos y marcador ---------- */
+  function addEvent(made,src){
+    events.push({m:made?1:0,t:Date.now(),s:src});
+    sSet('ce-eventos',events);
+    renderCounts();
+  }
+  function renderCounts(){
+    var mk=0;
+    events.forEach(function(e){ if(e.m) mk++; });
+    var tot=events.length, ms=tot-mk;
+    $('cMake').textContent=mk;
+    $('cMiss').textContent=ms;
+    $('cPct').textContent=tot?Math.round(mk/tot*100)+'%':'—';
+    var ul=$('logList'); ul.innerHTML='';
+    if(!tot){ ul.innerHTML='<li style="color:var(--mut)">Sin tiros todavía.</li>'; return; }
+    events.slice(-8).reverse().forEach(function(e){
+      var li=document.createElement('li');
+      var hh=new Date(e.t).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      li.innerHTML='<span>'+hh+' · '+(e.s==='auto'?'auto':'manual')+'</span>'+
+        '<span class="'+(e.m?'ok':'no')+'">'+(e.m?'Dentro':'Fuera')+'</span>';
+      ul.appendChild(li);
+    });
+  }
+
+  /* ---------- interfaz ---------- */
+  function setPill(t){ pill.textContent=t; }
+  function flashShow(made){
+    flash.textContent=made?'¡DENTRO!':'FUERA';
+    flash.style.background=made?'rgba(67,179,106,.32)':'rgba(217,83,79,.32)';
+    flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
+    setPill(made?'¡Dentro!':'Fuera');
+  }
+  function setMode(m){
+    mode=m; phase='idle';
+    $('segAdj').classList.toggle('on',m==='adjust');
+    $('segDet').classList.toggle('on',m==='detect');
+    overlay.parentElement.classList.toggle('detecting',m==='detect');
+    if(m==='detect'){
+      setPill(camOn?'Esperando tiro…':'Activa la cámara');
+      askWake();
+    }else{
+      setPill(camOn?'Modo ajuste: arrastra ARO y RED':'Activa la cámara');
+      if(wake){ wake.release().catch(function(){}); wake=null; }
+    }
+  }
+  $('segAdj').addEventListener('click',function(){ setMode('adjust'); });
+  $('segDet').addEventListener('click',function(){ setMode('detect'); });
+
+  $('thr').value=thr; $('thrVal').textContent=thr;
+  $('thr').addEventListener('input',function(){
+    thr=+this.value; $('thrVal').textContent=thr; thrTicks(); sSet('ce-thr',thr);
+  });
+
+  function syncSound(){ $('btnSound').classList.toggle('on',sound); }
+  $('btnSound').addEventListener('click',function(){ sound=!sound; sSet('ce-sonido',sound); syncSound(); initAudio(); });
+
+  $('btnMake').addEventListener('click',function(){ addEvent(true,'man'); });
+  $('btnMiss').addEventListener('click',function(){ addEvent(false,'man'); });
+  $('btnUndo').addEventListener('click',function(){ events.pop(); sSet('ce-eventos',events); renderCounts(); });
+
+  var wipeArm=false, wipeT=null;
+  $('btnReset').addEventListener('click',function(){
+    if(!wipeArm){
+      wipeArm=true; this.classList.add('warn');
+      this.textContent='¿Borrar todo? Toca de nuevo';
+      wipeT=setTimeout(function(){ wipeArm=false; var b=$('btnReset'); b.classList.remove('warn'); b.textContent='Reiniciar contador'; },2500);
+      return;
+    }
+    clearTimeout(wipeT); wipeArm=false;
+    events=[]; sSet('ce-eventos',events); renderCounts();
+    this.classList.remove('warn'); this.textContent='Reiniciar contador';
+  });
+
+  /* ---------- sonido ---------- */
+  function initAudio(){
+    if(audio||!sound) return;
+    try{ audio=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  }
+  function tone(f,t0,dur,type){
+    var o=audio.createOscillator(), g=audio.createGain();
+    o.type=type||'sine'; o.frequency.value=f;
+    g.gain.setValueAtTime(.0001,t0);
+    g.gain.exponentialRampToValueAtTime(.4,t0+.015);
+    g.gain.exponentialRampToValueAtTime(.0001,t0+dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t0); o.stop(t0+dur+.05);
+  }
+  function beep(made){
+    if(!sound||!audio) return;
+    try{
+      if(audio.state==='suspended') audio.resume();
+      var t=audio.currentTime;
+      if(made){ tone(880,t,.12); tone(1320,t+.11,.16); }
+      else{ tone(200,t,.22,'square'); }
+    }catch(e){}
+  }
+
+  /* ---------- pantalla despierta ---------- */
+  function askWake(){
+    if(!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function(w){ wake=w; }).catch(function(){});
+  }
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState==='visible' && mode==='detect') askWake();
+  });
+
+  /* ---------- ayuda ---------- */
+  $('btnHelpOk').addEventListener('click',function(){ $('help').classList.remove('on'); sSet('ce-ayuda',1); });
+  $('btnErrOk').addEventListener('click',function(){ $('camErr').classList.remove('on'); });
+  if(sGet('ce-ayuda',0)) $('help').classList.remove('on');
+
+  /* ---------- inicio ---------- */
+  drawZones(); thrTicks(); renderCounts(); syncSound();
+})();
+</script>
+</body>
+</html>
